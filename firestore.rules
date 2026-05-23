@@ -1,0 +1,183 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+    
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+    
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isSignedIn() { return request.auth != null; }
+
+    function isValidTrip(data) {
+      return data.keys().hasAll(['name', 'startDate', 'endDate', 'ownerId', 'createdAt', 'updatedAt']) 
+        && data.size() >= 6 && data.size() <= 7
+        && data.name is string && data.name.size() <= 100
+        && data.startDate is string && data.startDate.size() <= 50
+        && data.endDate is string && data.endDate.size() <= 50
+        && data.ownerId is string && data.ownerId == request.auth.uid
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp
+        && (!data.keys().hasAny(['isLocked']) || data.isLocked is bool);
+    }
+
+    function isTripOwner(tId) {
+      return isSignedIn() && get(/databases/$(database)/documents/trips/$(tId)).data.ownerId == request.auth.uid;
+    }
+
+    match /trips/{tripId} {
+      allow get: if isSignedIn() && (resource == null || existing().ownerId == request.auth.uid);
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+      
+      allow create: if isSignedIn() 
+        && isValidId(tripId)
+        && isValidTrip(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+        
+      allow update: if isSignedIn() 
+        && existing().ownerId == request.auth.uid
+        && incoming().ownerId == existing().ownerId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'startDate', 'endDate', 'updatedAt', 'isLocked']);
+        
+      allow delete: if isSignedIn() && existing().ownerId == request.auth.uid;
+
+      match /subGroups/{subGroupId} {
+        allow read: if isTripOwner(tripId);
+        allow create: if isTripOwner(tripId)
+          && isValidId(subGroupId)
+          && incoming().keys().hasAll(['name', 'members'])
+          && incoming().size() == 2
+          && incoming().name is string && incoming().name.size() <= 100
+          && incoming().members is list && incoming().members.size() <= 100;
+        allow update: if isTripOwner(tripId)
+          && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'members'])
+          && incoming().name is string && incoming().name.size() <= 100
+          && incoming().members is list && incoming().members.size() <= 100;
+        allow delete: if isTripOwner(tripId);
+      }
+
+      match /participants/{participantId} {
+        allow read: if isTripOwner(tripId);
+        allow create: if isTripOwner(tripId)
+          && isValidId(participantId)
+          && incoming().keys().hasAll(['name', 'gender'])
+          && incoming().size() == 2
+          && incoming().name is string && incoming().name.size() <= 100
+          && incoming().gender is string && (incoming().gender == 'nam' || incoming().gender == 'nữ');
+        allow update: if isTripOwner(tripId)
+          && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'gender'])
+          && incoming().name is string && incoming().name.size() <= 100
+          && incoming().gender is string && (incoming().gender == 'nam' || incoming().gender == 'nữ');
+        allow delete: if isTripOwner(tripId);
+      }
+
+      match /incomes/{incomeId} {
+        allow read: if isTripOwner(tripId);
+        allow create: if isTripOwner(tripId)
+          && isValidId(incomeId)
+          && incoming().keys().hasAll(['participantId', 'type', 'amount', 'note', 'date'])
+          && incoming().size() >= 5 && incoming().size() <= 6
+          && incoming().participantId is string && incoming().participantId.size() <= 128
+          && incoming().type is string && (incoming().type == 'member' || incoming().type == 'sponsor' || incoming().type == 'advance')
+          && incoming().amount is number
+          && incoming().note is string && incoming().note.size() <= 500
+          && incoming().date is string && incoming().date.size() <= 50
+          && (!incoming().keys().hasAny(['targetFund']) || (incoming().targetFund is string && incoming().targetFund.size() <= 128));
+        allow update: if isTripOwner(tripId)
+          && incoming().diff(existing()).affectedKeys().hasOnly(['participantId', 'type', 'amount', 'note', 'date', 'targetFund'])
+          && incoming().participantId is string && incoming().participantId.size() <= 128
+          && incoming().type is string && (incoming().type == 'member' || incoming().type == 'sponsor' || incoming().type == 'advance')
+          && incoming().amount is number
+          && incoming().note is string && incoming().note.size() <= 500
+          && incoming().date is string && incoming().date.size() <= 50
+          && (!incoming().keys().hasAny(['targetFund']) || (incoming().targetFund is string && incoming().targetFund.size() <= 128));
+        allow delete: if isTripOwner(tripId);
+      }
+
+      match /expenses/{expenseId} {
+        allow read: if isTripOwner(tripId);
+        allow create: if isTripOwner(tripId)
+          && isValidId(expenseId)
+          && incoming().keys().hasAll(['description', 'amount', 'isSponsored', 'sharedBy', 'paidBy', 'date'])
+          && incoming().size() == 6
+          && incoming().description is string && incoming().description.size() <= 500
+          && incoming().amount is number
+          && incoming().isSponsored is bool
+          && incoming().sharedBy is list && incoming().sharedBy.size() <= 100
+          && incoming().paidBy is string && incoming().paidBy.size() <= 128
+          && incoming().date is string && incoming().date.size() <= 50;
+        allow update: if isTripOwner(tripId)
+          && incoming().diff(existing()).affectedKeys().hasOnly(['description', 'amount', 'isSponsored', 'sharedBy', 'paidBy', 'date'])
+          && incoming().description is string && incoming().description.size() <= 500
+          && incoming().amount is number
+          && incoming().isSponsored is bool
+          && incoming().sharedBy is list && incoming().sharedBy.size() <= 100
+          && incoming().paidBy is string && incoming().paidBy.size() <= 128
+          && incoming().date is string && incoming().date.size() <= 50;
+        allow delete: if isTripOwner(tripId);
+      }
+
+      match /estimatedExpenses/{expenseId} {
+        allow read: if isTripOwner(tripId);
+        allow create: if isTripOwner(tripId)
+          && isValidId(expenseId)
+          && incoming().keys().hasAll(['description', 'amount', 'sharedBy', 'date'])
+          && incoming().size() >= 4 && incoming().size() <= 7
+          && incoming().description is string && incoming().description.size() <= 500
+          && incoming().amount is number
+          && incoming().sharedBy is list && incoming().sharedBy.size() <= 100
+          && incoming().date is string && incoming().date.size() <= 50
+          && (!incoming().keys().hasAny(['unitPrice']) || incoming().unitPrice is number)
+          && (!incoming().keys().hasAny(['quantity']) || incoming().quantity is number)
+          && (!incoming().keys().hasAny(['isSponsored']) || incoming().isSponsored is bool);
+        allow update: if isTripOwner(tripId)
+          && incoming().diff(existing()).affectedKeys().hasOnly(['description', 'amount', 'sharedBy', 'date', 'unitPrice', 'quantity', 'isSponsored'])
+          && incoming().description is string && incoming().description.size() <= 500
+          && incoming().amount is number
+          && incoming().sharedBy is list && incoming().sharedBy.size() <= 100
+          && incoming().date is string && incoming().date.size() <= 50
+          && (!incoming().keys().hasAny(['unitPrice']) || incoming().unitPrice is number)
+          && (!incoming().keys().hasAny(['quantity']) || incoming().quantity is number)
+          && (!incoming().keys().hasAny(['isSponsored']) || incoming().isSponsored is bool);
+        allow delete: if isTripOwner(tripId);
+      }
+
+      match /hotels/{hotelId} {
+        allow read: if isTripOwner(tripId);
+        allow create: if isTripOwner(tripId)
+          && isValidId(hotelId)
+          && incoming().keys().hasAll(['name', 'rooms'])
+          && incoming().size() == 2
+          && incoming().name is string && incoming().name.size() <= 200
+          && incoming().rooms is list && incoming().rooms.size() <= 200;
+        allow update: if isTripOwner(tripId)
+          && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'rooms'])
+          && incoming().name is string && incoming().name.size() <= 200
+          && incoming().rooms is list && incoming().rooms.size() <= 200;
+        allow delete: if isTripOwner(tripId);
+      }
+
+      match /fixedGroups/{groupId} {
+        allow read: if isTripOwner(tripId);
+        allow create: if isTripOwner(tripId)
+          && isValidId(groupId)
+          && incoming().keys().hasAll(['name', 'memberIds'])
+          && incoming().size() == 2
+          && incoming().name is string && incoming().name.size() <= 100
+          && incoming().memberIds is list && incoming().memberIds.size() <= 50;
+        allow update: if isTripOwner(tripId)
+          && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'memberIds'])
+          && incoming().name is string && incoming().name.size() <= 100
+          && incoming().memberIds is list && incoming().memberIds.size() <= 50;
+        allow delete: if isTripOwner(tripId);
+      }
+    }
+  }
+}
