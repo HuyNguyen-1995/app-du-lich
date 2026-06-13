@@ -1,0 +1,167 @@
+{
+  "entities": {
+    "Trip": {
+      "title": "Trip",
+      "description": "A travel trip",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "startDate": { "type": "string" },
+        "endDate": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" },
+        "isLocked": { "type": "boolean" }
+      },
+      "required": ["name", "ownerId", "createdAt", "updatedAt"]
+    },
+    "SubGroup": {
+      "title": "SubGroup",
+      "description": "A smaller sub-group of members within a trip",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "members": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "required": ["name", "members"]
+    },
+    "Participant": {
+      "title": "Participant",
+      "description": "Member of a trip",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "gender": { "type": "string", "enum": ["nam", "nữ"] }
+      },
+      "required": ["name", "gender"]
+    },
+    "Income": {
+      "title": "Income",
+      "description": "Money deposited to the fund",
+      "type": "object",
+      "properties": {
+        "participantId": { "type": "string" },
+        "type": { "type": "string", "enum": ["member", "sponsor", "advance"] },
+        "targetFund": { "type": "string" },
+        "amount": { "type": "number" },
+        "note": { "type": "string" },
+        "date": { "type": "string" }
+      },
+      "required": ["amount", "date"]
+    },
+    "Expense": {
+      "title": "Expense",
+      "description": "An expense item",
+      "type": "object",
+      "properties": {
+        "description": { "type": "string" },
+        "amount": { "type": "number" },
+        "isSponsored": { "type": "boolean" },
+        "sharedBy": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "paidBy": { "type": "string" },
+        "date": { "type": "string" }
+      },
+      "required": ["description", "amount", "isSponsored", "sharedBy", "date"]
+    },
+    "EstimatedExpense": {
+      "title": "EstimatedExpense",
+      "description": "An estimated expense item",
+      "type": "object",
+      "properties": {
+        "description": { "type": "string" },
+        "amount": { "type": "number" },
+        "unitPrice": { "type": "number", "description": "Optional unit price" },
+        "quantity": { "type": "number", "description": "Optional quantity" },
+        "sharedBy": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "date": { "type": "string" }
+      },
+      "required": ["description", "amount", "sharedBy", "date"]
+    },
+    "Hotel": {
+      "title": "Hotel",
+      "description": "Hotel and room assignments",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "rooms": {
+          "type": "array",
+          "items": { "type": "object" }
+        }
+      },
+      "required": ["name", "rooms"]
+    },
+    "FixedGroup": {
+      "title": "FixedGroup",
+      "description": "Fixed group of members",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "memberIds": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "required": ["name", "memberIds"]
+    },
+    "ScheduleItem": {
+      "title": "ScheduleItem",
+      "description": "Sightseeing plan of a trip",
+      "type": "object",
+      "properties": {
+        "startTime": { "type": "string" },
+        "endTime": { "type": "string" },
+        "location": { "type": "string" },
+        "note": { "type": "string" },
+        "date": { "type": "string" }
+      },
+      "required": ["startTime", "endTime", "location", "date"]
+    }
+  },
+  "firestore": {
+    "/trips/{tripId}": {
+      "schema": { "$ref": "#/entities/Trip" },
+      "description": "Trips collection"
+    },
+    "/trips/{tripId}/subGroups/{subGroupId}": {
+      "schema": { "$ref": "#/entities/SubGroup" },
+      "description": "Subgroups for this trip"
+    },
+    "/trips/{tripId}/hotels/{hotelId}": {
+      "schema": { "$ref": "#/entities/Hotel" },
+      "description": "Hotels and rooms for this trip"
+    },
+    "/trips/{tripId}/fixedGroups/{groupId}": {
+      "schema": { "$ref": "#/entities/FixedGroup" },
+      "description": "Fixed groups of members"
+    },
+    "/trips/{tripId}/participants/{participantId}": {
+      "schema": { "$ref": "#/entities/Participant" },
+      "description": "Participants in the trip"
+    },
+    "/trips/{tripId}/incomes/{incomeId}": {
+      "schema": { "$ref": "#/entities/Income" },
+      "description": "Incomes for the trip"
+    },
+    "/trips/{tripId}/expenses/{expenseId}": {
+      "schema": { "$ref": "#/entities/Expense" },
+      "description": "Expenses for the trip"
+    },
+    "/trips/{tripId}/estimatedExpenses/{expenseId}": {
+      "schema": { "$ref": "#/entities/EstimatedExpense" },
+      "description": "Estimated expenses for the trip"
+    },
+    "/trips/{tripId}/schedules/{scheduleId}": {
+      "schema": { "$ref": "#/entities/ScheduleItem" },
+      "description": "Trip schedule items"
+    }
+  }
+}
